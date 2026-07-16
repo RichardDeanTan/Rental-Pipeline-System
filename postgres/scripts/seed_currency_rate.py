@@ -48,7 +48,7 @@ def main():
     FILENAME = "postgres/data/currency_rate.csv"
     
     fetcher = CurrencyFetcher(
-        start_date="2010-01-01", 
+        start_date="2005-01-01", 
         end_date="2026-07-01", 
         base_currency="USD", 
         target_currency="IDR"
