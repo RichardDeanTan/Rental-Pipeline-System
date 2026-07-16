@@ -1,5 +1,6 @@
 assets/
 testing/
+secrets/
 postgres/eda_raw.sql
 architecture system.png
 DWH_Schema.md
