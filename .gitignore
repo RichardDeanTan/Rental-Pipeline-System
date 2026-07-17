@@ -2,6 +2,7 @@ venv/
 assets/
 testing/
 secrets/
+*.tfvars
 postgres/eda_raw.sql
 architecture system.png
 DWH_Schema.md
