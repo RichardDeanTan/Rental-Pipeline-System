@@ -1,0 +1,129 @@
+version: 2
+
+models:
+  # --- TRANSACTION ---
+  - name: stg_rental
+    description: "Satu baris per rental. Sudah di-cast & dedup."
+    columns:
+      - name: rental_id
+        description: "PK rental."
+        tests: [unique, not_null]
+      - name: inventory_id
+        tests: [not_null]
+      - name: customer_id
+        tests: [not_null]
+
+  - name: stg_payment
+    description: "Satu baris per payment. amount NUMERIC."
+    columns:
+      - name: payment_id
+        description: "PK payment."
+        tests: [unique, not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: amount
+        tests: [not_null]
+
+  # --- BRIDGE ---
+  - name: stg_inventory
+    description: "Jembatan inventory_id -> film_id & store_id."
+    columns:
+      - name: inventory_id
+        tests: [unique, not_null]
+      - name: film_id
+        tests: [not_null]
+      - name: store_id
+        tests: [not_null]
+
+  # --- DIMENSION ---
+  - name: stg_customer
+    description: "Pelanggan. is_active dari activebool; active(INT64) di-drop."
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+
+  - name: stg_staff
+    description: "Staff. password & picture di-drop."
+    columns:
+      - name: staff_id
+        tests: [unique, not_null]
+
+  - name: stg_store
+    columns:
+      - name: store_id
+        tests: [unique, not_null]
+
+  - name: stg_film
+    description: "Film. special_features & fulltext di-drop; rental_duration -> allowed_rental_duration."
+    columns:
+      - name: film_id
+        tests: [unique, not_null]
+      - name: rating
+        description: "Rating film."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['G', 'PG', 'PG-13', 'R', 'NC-17']
+
+  # --- LOOKUP ---
+  - name: stg_actor
+    columns:
+      - name: actor_id
+        tests: [unique, not_null]
+
+  - name: stg_film_actor
+    description: "Pasangan film-aktor. PK gabungan diverifikasi via test unique kombinasi."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [film_id, actor_id]
+    columns:
+      - name: film_id
+        tests: [not_null]
+      - name: actor_id
+        tests: [not_null]
+
+  - name: stg_film_category
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [film_id, category_id]
+    columns:
+      - name: film_id
+        tests: [not_null]
+      - name: category_id
+        tests: [not_null]
+
+  - name: stg_category
+    columns:
+      - name: category_id
+        tests: [unique, not_null]
+
+  - name: stg_language
+    columns:
+      - name: language_id
+        tests: [unique, not_null]
+
+  - name: stg_address
+    columns:
+      - name: address_id
+        tests: [unique, not_null]
+
+  - name: stg_city
+    columns:
+      - name: city_id
+        tests: [unique, not_null]
+
+  - name: stg_country
+    columns:
+      - name: country_id
+        tests: [unique, not_null]
+
+  # --- CURRENCY ---
+  - name: stg_exchange_rate
+    description: "Kurs USD->IDR bulanan."
+    columns:
+      - name: rate_date
+        tests: [unique, not_null]
+      - name: rate
+        tests: [not_null]
