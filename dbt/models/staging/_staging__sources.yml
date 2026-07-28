@@ -1,0 +1,55 @@
+version: 2
+
+sources:
+  - name: bronze
+    database: rental-pipeline-project
+    schema: bronze
+    description: "Raw layer — hasil extract Postgres/API oleh pipeline Python (STEP 3)."
+
+    tables:
+      # --- TRANSACTION ---
+      - name: rental
+        description: "Satu baris = satu transaksi rental."
+        config:
+          loaded_at_field: last_update
+          freshness:
+            warn_after: {count: 30, period: day}
+            error_after: {count: 90, period: day}
+      - name: payment
+        description: "Satu baris = satu transaksi payment."
+
+      # --- BRIDGE ---
+      - name: inventory
+        description: "Kopi fisik film di store. Jembatan inventory_id -> film_id & store_id."
+
+      # --- DIMENSION ---
+      - name: customer
+        description: "Data pelanggan (sumber untuk dim_customer SCD2)."
+      - name: staff
+        description: "Data staff (sumber untuk dim_staff SCD2)."
+      - name: store
+        description: "Data toko."
+      - name: film
+        description: "Katalog film."
+
+      # --- LOOKUP ---
+      - name: actor
+        description: "Aktor (sumber dim_actor)."
+      - name: film_actor
+        description: "Pasangan film-aktor (sumber bridge_film_actor)."
+      - name: film_category
+        description: "Pasangan film-kategori."
+      - name: category
+        description: "Nama kategori film."
+      - name: language
+        description: "Nama bahasa film."
+      - name: address
+        description: "Alamat (flatten ke dim_customer & dim_store)."
+      - name: city
+        description: "Kota (flatten)."
+      - name: country
+        description: "Negara (flatten)."
+
+      # --- CURRENCY ---
+      - name: exchange_rate
+        description: "Kurs USD->IDR granularity bulanan (Jalur A via Postgres)."
