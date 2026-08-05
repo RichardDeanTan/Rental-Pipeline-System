@@ -7,12 +7,12 @@ secrets/
 *.tfstate
 .terraform/
 postgres/eda_raw.sql
-architecture system.png
 DWH_Schema.md
 
 keys.txt
 Project Roadmap.md
 steps.txt
 
-gold layer.png
 PROGRESS_STEP0-4.md
+
+*architecture system.excalidraw
