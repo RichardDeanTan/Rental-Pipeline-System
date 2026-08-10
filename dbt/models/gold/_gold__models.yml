@@ -1,0 +1,201 @@
+version: 2
+
+models:
+  # --- DIMENSION ---
+
+  - name: dim_date
+    description: "Dimensi kalender generated, 2005-01-01 s/d 2030-12-31. Role-playing untuk rental/return/payment date."
+    columns:
+      - name: date_id
+        description: "Smart key YYYYMMDD (INT64). Sortable & range-queryable."
+        tests: [unique, not_null]
+      - name: date
+        tests: [unique, not_null]
+
+  - name: dim_currency
+    description: "Referensi mata uang (USD, IDR). Conformed dimension."
+    columns:
+      - name: currency_sk
+        tests: [unique, not_null]
+      - name: currency_code
+        tests: [unique, not_null]
+
+  - name: dim_actor
+    description: "Satu baris per aktor."
+    columns:
+      - name: actor_sk
+        tests: [unique, not_null]
+      - name: actor_id
+        tests: [unique, not_null]
+
+  - name: dim_film
+    description: "Satu baris per film. Snowflake language & category sudah diratakan. special_features & fulltext di-drop."
+    columns:
+      - name: film_sk
+        tests: [unique, not_null]
+      - name: film_id
+        tests: [unique, not_null]
+      - name: rating
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['G', 'PG', 'PG-13', 'R', 'NC-17']
+
+  - name: dim_store
+    description: "Satu baris per toko. Alamat & manajer sudah diratakan."
+    columns:
+      - name: store_sk
+        tests: [unique, not_null]
+      - name: store_id
+        tests: [unique, not_null]
+
+  - name: bridge_film_actor
+    description: "Menyelesaikan many-to-many film<->aktor. Kolom weight untuk alokasi proporsional."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [film_id, actor_id]
+    columns:
+      - name: film_sk
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_film')
+                field: film_sk
+      - name: actor_sk
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_actor')
+                field: actor_sk
+
+  - name: dim_customer
+    description: "SCD Type 2 — satu baris per VERSI customer. is_current = versi terkini; is_active = status di sumber."
+    columns:
+      - name: customer_sk
+        description: "Hash dari (customer_id + effective_start_date). Unik per versi."
+        tests: [unique, not_null]
+      - name: customer_id
+        description: "Natural key. TIDAK unik (satu customer bisa banyak versi)."
+        tests: [not_null]
+      - name: effective_start_date
+        tests: [not_null]
+      - name: effective_end_date
+        tests: [not_null]
+
+  - name: dim_staff
+    description: "SCD Type 2 — satu baris per VERSI staff. password & picture dikecualikan."
+    columns:
+      - name: staff_sk
+        tests: [unique, not_null]
+      - name: staff_id
+        tests: [not_null]
+      - name: effective_start_date
+        tests: [not_null]
+      - name: effective_end_date
+        tests: [not_null]
+
+  # --- FACTS ---
+  - name: fact_currency_rate
+    description: "Kurs per periode berlaku. Rentang KONTINU sehingga setiap tanggal pasti dapat kurs."
+    columns:
+      - name: currency_rate_sk
+        tests: [unique, not_null]
+      - name: currency_sk
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_currency')
+                field: currency_sk
+      - name: rate_value
+        tests: [not_null]
+      - name: effective_start_date
+        tests: [not_null]
+      - name: effective_end_date
+        tests: [not_null]
+
+  - name: fact_rental
+    description: "Grain: satu rental. is_paid menggantikan kebutuhan join fact-to-fact."
+    columns:
+      - name: rental_sk
+        tests: [unique, not_null]
+      - name: rental_id
+        tests: [unique, not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: customer_sk
+        description: "FK ke versi dim_customer yang berlaku saat rental terjadi."
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_sk
+      - name: film_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_film')
+                field: film_id
+      - name: store_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_store')
+                field: store_id
+      - name: rental_date_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_id
+      - name: is_paid
+        tests: [not_null]
+      - name: is_returned
+        tests: [not_null]
+
+  - name: fact_payment
+    description: "Grain: satu payment. amount_idr dihitung dengan kurs BULAN transaksi."
+    columns:
+      - name: payment_sk
+        tests: [unique, not_null]
+      - name: payment_id
+        tests: [unique, not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: customer_sk
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_sk
+      - name: payment_date_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_id
+      - name: currency_sk
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_currency')
+                field: currency_sk
+      - name: amount_usd
+        description: "Measure utama, additive. Aman di-SUM."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                strictly: false
+      - name: amount_idr
+        description: "amount_usd x kurs bulan transaksi. Pre-computed di gold."
+        tests: [not_null]
